@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쉬운 카드마술 배우기</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7a3cff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="마술 배우기">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{--bg:#f6f3ee;--card:#fff;--ink:#1d1b26;--mute:#6b6878;--accent:#7a3cff;--gold:#f2a900;--line:#e4dfd6;--back:#3b4cca;--backin:#8fa0ff;--felt:#eae4f7}
+@media (prefers-color-scheme:dark){:root{--bg:#14121c;--card:#201d2c;--ink:#f2eff8;--mute:#a29db3;--accent:#a98bff;--line:#322e42;--felt:#2a2540}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,"Malgun Gothic",sans-serif;line-height:1.6}
+main{max-width:640px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.6rem;margin:8px 0 4px}
+.sub{color:var(--mute);margin:0 0 20px}
+.tile{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;cursor:pointer;color:inherit;font:inherit}
+.tile:hover{border-color:var(--accent)}
+.tile h2{margin:0 0 4px;font-size:1.15rem}
+.tile p{margin:0;color:var(--mute)}
+.tag{display:inline-block;font-size:.78rem;padding:2px 8px;border-radius:99px;background:var(--felt);margin:8px 6px 0 0}
+.done{color:#1a9a55;font-weight:600}
+.back{background:none;border:none;color:var(--accent);font:inherit;cursor:pointer;padding:4px 0;margin-bottom:6px}
+.stage{background:var(--felt);border-radius:14px;padding:8px}
+svg{width:100%;height:auto;display:block}
+.cf{fill:#fff;stroke:#555;stroke-width:1.2}
+.cb{fill:var(--back);stroke:#222;stroke-width:1.2}
+.cbi{fill:none;stroke:var(--backin);stroke-width:1.5}
+.hi{stroke:var(--gold);stroke-width:3.5}
+.ct{font:700 15px system-ui;fill:#222}.ct.red{fill:#d12b3a}
+.lb{font:600 12px system-ui,"Malgun Gothic";fill:var(--ink)}
+.lb.m{fill:var(--mute);font-weight:400}
+.ar{stroke:var(--accent);stroke-width:3;fill:none;stroke-linecap:round}
+.arh{fill:var(--accent)}
+.step h2{font-size:1.2rem;margin:16px 0 4px}
+.step p{margin:4px 0}
+.say{background:var(--card);border-left:4px solid var(--accent);padding:8px 12px;border-radius:6px;margin:12px 0;color:var(--mute)}
+.nav{display:flex;gap:10px;margin-top:16px}
+button.b{flex:1;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;cursor:pointer}
+button.b.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.b:disabled{opacity:.4;cursor:default}
+.dots{display:flex;gap:6px;justify-content:center;margin:10px 0}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--line)}.dot.on{background:var(--accent)}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:14px}
+.box h3{margin:0 0 4px;font-size:1rem}
+.box ul{margin:4px 0;padding-left:20px}
+.box p{margin:4px 0}
+.foot{margin-top:24px;text-align:center}
+.foot a{color:var(--accent);cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 14px;font:inherit;font-size:.9rem;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.hint{color:var(--mute);font-size:.85rem}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+/* ---------- SVG 그림 도우미 ---------- */
+const W=44,H=62;
+function card(x,y,o={}){
+  const t=o.rot!==undefined?` transform="rotate(${o.rot} ${o.px??x+W/2} ${o.py??y+H/2})"`:'';
+  let s=`<g${t}>`;
+  if(o.face){
+    const red=/[♥♦]/.test(o.face);
+    s+=`<rect x="${x}" y="${y}" width="${W}" height="${H}" rx="5" class="cf${o.hi?' hi':''}"/><text x="${x+W/2}" y="${y+H/2+6}" text-anchor="middle" class="ct${red?' red':''}">${o.face}</text>`;
+  }else{
+    s+=`<rect x="${x}" y="${y}" width="${W}" height="${H}" rx="5" class="cb${o.hi?' hi':''}"/><rect x="${x+6}" y="${y+6}" width="${W-12}" height="${H-12}" rx="3" class="cbi"/>`;
+  }
+  return s+'</g>';
+}
+/* 겹쳐진 카드 더미: 마지막(맨 아래 그려진) 카드는 hiLast 로 강조 */
+function pile(x,y,n,dy,o={}){let s='';for(let i=0;i<n;i++)s+=card(x,y+i*dy,{hi:o.all||(o.hiIdx===i)});return s}
+const text=(x,y,t,cls='lb',a='middle')=>`<text x="${x}" y="${y}" text-anchor="${a}" class="${cls}">${t}</text>`;
+function arrow(x1,y1,x2,y2){
+  const a=Math.atan2(y2-y1,x2-x1),l=10,p=d=>`${x2-l*Math.cos(a+d)},${y2-l*Math.sin(a+d)}`;
+  return `<path class="ar" d="M${x1} ${y1} L${x2} ${y2}"/><path class="arh" d="M${x2} ${y2} L${p(.45)} L${p(-.45)} Z"/>`;
+}
+const svg=b=>`<svg viewBox="0 0 320 210" role="img">${b}</svg>`;
+
+/* ---------- 마술 데이터 ---------- */
+const TRICKS=[
+{
+ id:'21',title:'21장 카드 마술',level:'★☆☆ 아주 쉬움',time:'약 3분',
+ desc:'관객이 마음속으로 고른 카드를 세 번의 줄 세우기만으로 맞혀요. 연습 없이 바로 되는 자동 마술.',
+ need:'카드 21장 (아무 카드나 가능)',
+ why:'고른 줄을 매번 가운데에 끼우면 고른 카드가 점점 한가운데로 모입니다. 세 번 반복하면 정확히 위에서 11번째에 고정돼요.',
+ tips:['한 장씩 같은 속도로, 줄 순서가 헷갈리지 않게 천천히 깔아요.','"어느 줄이에요?"만 묻고 카드 내용은 절대 보지 마세요.','마지막에 한 장씩 넘기다 11번째에서 멈칫하면 연출 효과가 두 배!'],
+ steps:[
+  {t:'카드 21장 보여주기',x:'아무 카드 21장을 부채처럼 펼쳐 보여주세요. 관객은 한 장을 속으로만 기억합니다. 말하거나 만지지 않아요.',say:'"마음에 드는 카드 한 장만 머릿속에 담아 보세요. 말하면 안 돼요!"',
+   svg:svg(Array.from({length:7},(_,i)=>card(138,40,{rot:-36+i*12,px:160,py:175,hi:i===3})).join('')+text(160,22,'관객이 한 장을 속으로 기억','lb')+text(160,203,'황금 테두리 = 관객이 고른 카드','lb m'))},
+  {t:'세 줄로 나눠 깔기',x:'앞면이 보이게 왼쪽→가운데→오른쪽→다시 왼쪽… 순서로 한 장씩 놓아 7장짜리 세 줄을 만듭니다.',say:'"카드를 세 줄로 나눠 볼게요. 고른 카드가 어느 줄에 있는지만 알려 주세요."',
+   svg:svg([40,138,236].map((x,i)=>pile(x,14,7,12,{hiIdx:i===1?3:-1})+text(x+22,128+6,'')).join('')+[40,138,236].map((x,i)=>text(x+22,180,`${i+1}번 줄`)).join('')+text(160,202,'카드는 7장씩 세 줄이 됩니다','lb m'))},
+  {t:'고른 줄을 가운데 끼우기',x:'관객이 가리킨 줄을 집어, 다른 두 줄 사이에 끼워서 하나로 포갭니다. 세 줄 중 순서는 "다른 줄 → 고른 줄 → 다른 줄"이 됩니다. 이때 카드는 뒤집어 한 덱으로 모아요.',say:'"자, 이제 카드를 한데 모을게요."',
+   svg:svg(pile(34,6,3,7)+pile(138,6,3,7,{all:true})+pile(242,6,3,7)+text(56,100,'다른 줄','lb m')+text(160,100,'고른 줄','lb')+text(264,100,'다른 줄','lb m')+arrow(160,108,160,128)+card(138,126,{})+card(138,134,{hi:true})+card(138,142,{})+text(220,155,'고른 줄이 가운데','lb','start')+text(220,172,'(7장씩 3덩이)','lb m','start'))},
+  {t:'같은 과정 2번 더 반복',x:'모은 덱을 다시 세 줄로 깔고, 줄을 물어보고, 고른 줄을 가운데 끼워 모으기를 총 세 번 합니다. 매번 카드가 가운데로 모여요.',say:'"조금 더 집중해 볼게요… 잡음이 있네요. 한 번만 더요."',
+   svg:svg(text(160,40,'깔기 → 묻기 → 가운데 끼우기','lb')+text(160,70,'총 3번 반복','lb')+[0,1,2].map(i=>card(75+i*70,92,{hi:i===2,face:`${i+1}회`})).join('')+arrow(124,123,142,123)+arrow(194,123,212,123)+text(160,190,'마지막 3회째가 끝나면 준비 완료!','lb m'))},
+  {t:'위에서 11번째 카드가 정답!',x:'덱을 앞면이 아래로 놓고 한 장씩 위에서부터 세어, 11번째 카드를 뒤집습니다. 그게 관객이 고른 카드예요.',say:'"당신이 생각한 카드는… 바로 이 카드죠!"',
+   svg:svg(Array.from({length:11},(_,i)=>10-i).map(i=>card(130,8+i*12,{hi:i===10})).join('')+text(100,28,'1','lb','end')+text(100,140,'11번째','lb','end')+arrow(104,138,126,138)+text(214,150,'← 이 카드!','lb','start'))}
+ ]
+},
+{
+ id:'key',title:'키 카드 읽기',level:'★★☆ 쉬움',time:'약 2분',
+ desc:'덱의 맨 아래 카드를 몰래 기억해 두면, 관객이 뽑아 섞은 카드도 찾아낼 수 있는 기본 중의 기본 기술.',
+ need:'카드 한 벌 (52장)',
+ why:'관객 카드를 덱 맨 위에 올리고 컷하면, 몰래 기억한 맨 아래 카드(키 카드)가 바로 그 카드 앞에 붙게 돼요. 키 카드를 찾으면 다음 카드가 정답입니다.',
+ tips:['덱을 정리하는 척하며 맨 아래 카드를 자연스럽게 슬쩍 보세요.','관객이 카드를 뽑을 때 덱을 계속 들고 있어야 키 카드가 맨 아래에 유지돼요.','카드를 찾을 때 "느낌이 오네요…" 하며 시간을 끌면 훨씬 마술 같아요.'],
+ steps:[
+  {t:'맨 아래 카드를 몰래 기억',x:'덱을 정리하는 척하며 맨 아래 카드를 슬쩍 확인하고 기억합니다. 이게 키 카드예요. 아래 그림에서는 ♠7입니다.',say:'(속으로) "맨 아래는 ♠7…"',
+   svg:svg(pile(120,20,6,2.5)+card(120,35,{face:'♠7',hi:true,rot:-6,py:100})+text(220,56,'👁 슬쩍 확인','lb','start')+text(160,170,'맨 아래 카드 = 키 카드 (♠7)','lb')+text(160,192,'관객에게는 비밀!','lb m'))},
+  {t:'관객이 아무 카드나 한 장 뽑기',x:'덱을 손에 든 채로 관객에게 아무 카드나 뽑게 하세요. 보고 기억하게 한 뒤 다른 사람에게 보여줘도 좋아요. 당신은 보지 않습니다.',say:'"아무 카드나 한 장 뽑아서 기억하세요. 저는 안 볼게요."',
+   svg:svg(pile(36,30,6,2.5)+card(36,60,{})+card(186,24,{face:'♥Q',hi:true,rot:10})+arrow(110,90,178,66)+text(98,170,'덱은 계속 내 손에','lb')+text(224,126,'관객이 보고 기억','lb'))},
+  {t:'뽑은 카드를 덱 맨 위에 올리기',x:'관객이 본 카드를 앞면 아래로 하여 덱의 맨 위에 올려 달라고 합니다. 이제 정답 카드는 맨 위, 키 카드는 맨 아래에 있어요.',say:'"카드를 이 덱 위에 올려 주세요."',
+   svg:svg(pile(120,86,6,2.5)+card(120,28,{hi:true})+arrow(160,98,160,122)+text(52,48,'♥Q 맨 위','lb','start')+text(52,170,'♠7 맨 아래','lb','start')+text(160,200,'정답 카드: 맨 위 / 키 카드: 맨 아래','lb m'))},
+  {t:'덱을 한 번 컷하기',x:'덱의 윗부분을 집어 테이블에 놓고, 아랫부분을 그 위에 올려 컷을 완성합니다. 이제 ♠7(키 카드) 바로 아래에 ♥Q가 붙었어요!',say:'"덱을 섞어서 카드를 완전히 숨길게요."',
+   svg:svg(pile(40,14,5,6)+card(40,14,{hi:true})+text(62,126,'A (윗부분)','lb')+pile(222,14,5,6)+text(244,126,'B (아랫부분)','lb')+arrow(88,70,152,70)+arrow(152,70,210,70)+card(106,112,{face:'♠7'})+card(166,112,{face:'♥Q',hi:true})+arrow(152,143,164,143)+text(128,190,'키 카드','lb')+text(188,190,'정답','lb')+text(160,205,'컷 후: ♠7 바로 뒤에 ♥Q가 붙음','lb m'))},
+  {t:'키 카드 뒤 카드를 뒤집기',x:'덱을 앞면이 보이게 한 장씩 넘기며 키 카드(♠7)를 찾고, 바로 다음 카드가 관객이 고른 카드입니다.',say:'"이 카드를 만지는 순간 손끝이 찌릿하네요… 혹시, 이 카드 아닌가요?"',
+   svg:svg(card(20,60,{face:'♣3'})+card(70,60,{face:'♦9'})+card(120,60,{face:'♠7'})+text(142,52,'키 카드','lb')+card(170,60,{face:'♥Q',hi:true})+text(192,52,'정답!','lb')+card(220,60,{face:'♠2'})+arrow(150,150,185,130)+text(160,175,'키 카드 바로 다음 카드','lb'))}
+ ]
+}
+];
+
+/* ---------- 추가 마술용 도우미 ---------- */
+const big=(x,y,t,sz=26,a='middle')=>`<text x="${x}" y="${y}" text-anchor="${a}" class="lb" style="font-size:${sz}px;font-weight:700">${t}</text>`;
+const PIPS={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+function die(x,y,n,s=44,hi){
+  let g=`<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="7" class="cf${hi?' hi':''}"/>`;
+  PIPS[n].forEach(i=>{g+=`<circle cx="${x+s*(0.25+0.25*(i%3))}" cy="${y+s*(0.25+0.25*Math.floor(i/3))}" r="${s/13}" fill="#222"/>`});
+  return g;
+}
+function numcard(x,y,nums,hi){
+  let g=`<rect x="${x}" y="${y}" width="68" height="104" rx="6" class="cf${hi?' hi':''}"/>`;
+  nums.forEach((n,i)=>{g+=`<text x="${x+(i%2?48:20)}" y="${y+22+Math.floor(i/2)*24}" text-anchor="middle" class="ct" style="font-size:${i===0?17:13}px${i===0?';fill:#7a3cff':''}">${n}</text>`});
+  return g;
+}
+const NC={A:[1,3,5,7,9,11,13,15],B:[2,3,6,7,10,11,14,15],C:[4,5,6,7,12,13,14,15],D:[8,9,10,11,12,13,14,15]};
+const dash=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" class="ar" style="stroke-width:2;stroke-dasharray:5 4"/>`;
+
+TRICKS.push(
+{
+ id:'pairs',title:'빨강·검정 짝짓기',level:'★☆☆ 아주 쉬움',time:'약 2분',
+ desc:'관객이 직접 섞은 카드인데도, 두 장씩 짝지으면 모든 짝이 빨강 하나 + 검정 하나가 돼요.',
+ need:'카드 20장 (빨강 10장, 검정 10장)',
+ why:'빨강·검정을 번갈아 쌓아 두고, 윗부분을 한 장씩 딜해 순서를 뒤집은 뒤 리플 셔플을 한 번 하면 카드가 항상 "빨강/검정 쌍"으로 섞여요. 이를 질버리스(Gilbreath) 원리라고 불러요.',
+ tips:['처음 번갈아 쌓은 것을 들키지 않도록 "아무 카드나 20장 뽑았어요"라고 말하며 뒤집어 놓아요.','"컷"이 아니라 반드시 "한 장씩 딜"해야 해요. 이게 핵심이에요.','셔플은 한 번만 해요. 여러 번 섞으면 효과가 사라져요.','섞은 뒤에는 덱을 컷하지 말고 바로 짝을 펼치세요.'],
+ steps:[
+  {t:'빨강·검정을 번갈아 쌓기',x:'미리 빨강, 검정, 빨강, 검정… 순서로 20장을 번갈아 쌓아 둡니다(앞면이 아래인 덱). 관객에게는 보이지 않게 해요.',say:'"카드 20장을 준비했어요. 그냥 평범한 카드죠."',
+   svg:svg(Array.from({length:8},(_,i)=>card(14+i*35,60,{face:i%2?'♠':'♥'})).join('')+text(160,35,'위에서부터 빨강·검정이 번갈아 (비밀!)','lb')+text(160,170,'앞면: ♥ ♠ ♥ ♠ ♥ ♠ …','lb m'))},
+  {t:'관객이 한 장씩 딜해 더미 만들기',x:'관객이 덱 윗부분에서 한 장씩 테이블에 내려놓아 약 절반(8~12장)짜리 더미를 만들게 합니다. 이렇게 하면 더미의 카드 순서가 거꾸로 뒤집혀요.',say:'"카드를 한 장씩, 마음 가는 만큼만 내려놓아 보세요."',
+   svg:svg(pile(40,40,5,5)+text(62,150,'남은 덱','lb')+pile(214,40,5,5)+text(236,150,'한 장씩 딜한 더미','lb')+arrow(100,70,200,70)+text(160,58,'한 장씩','lb m')+text(160,200,'"컷"이 아니라 반드시 한 장씩!','lb m'))},
+  {t:'두 더미를 한 번만 리플 셔플',x:'두 더미를 겹쳐 리플 셔플(카드가 번갈아 끼어 들어가게)을 딱 한 번만 하고 덱을 모읍니다. 컷은 하지 않아요.',say:'"자, 이제 완전히 섞어 보세요. 한 번이면 충분해요."',
+   svg:svg(pile(44,6,3,6)+pile(232,6,3,6)+arrow(90,40,128,86)+arrow(232,40,194,86)+pile(138,100,4,6)+text(160,200,'딱 한 번만 섞기','lb'))},
+  {t:'두 장씩 짝을 펼치기',x:'덱 윗부분부터 두 장씩 뽑아 앞면으로 펼칩니다. 모든 짝이 빨강 한 장 + 검정 한 장이에요!',say:'"모든 짝이 빨강 하나, 검정 하나! 섞어도 색이 짝을 이뤘네요."',
+   svg:svg([['♥','♠'],['♠','♥'],['♠','♥']].map((p,i)=>dash(10+i*100,38,96,86)+card(16+i*100,50,{face:p[0]})+card(56+i*100,50,{face:p[1]})+text(58+i*100,145,'빨강 + 검정','lb')).join('')+text(160,190,'(위에서부터 두 장씩 나눠 보세요)','lb m'))}
+ ]
+},
+{
+ id:'1089',title:'마법의 숫자 1089',level:'★☆☆ 아주 쉬움',time:'약 2분',
+ desc:'관객이 아무 숫자나 마음대로 계산해도 결과는 언제나 1089. 미리 써둔 예언이 딱 맞아요.',
+ need:'종이와 펜 (계산기도 좋아요)',
+ why:'첫째 자리와 끝자리가 다른 세 자리 수를 거꾸로 뒤집어 뺀 값은 항상 99의 배수(099, 198, …, 891)가 되고, 그 값을 뒤집어 더하면 언제나 1089가 돼요.',
+ tips:['예언 쪽지는 쓰기 전에 접어서 컵 밑에 두면 더 극적이에요.','첫째 자리와 끝자리가 같으면(예: 343) 안 돼요. 규칙을 꼭 말해 주세요.','뺀 결과가 두 자리(예: 99)면 앞에 0을 붙여 세 자리(099)로 계산하라고 알려 주세요.'],
+ steps:[
+  {t:'예언을 미리 써서 숨기기',x:'종이에 "1089"를 써서 접은 뒤 봉투나 컵 밑에 둡니다. 관객이 계산하는 동안 건드리지 않아요.',say:'"제가 미리 예언을 써 두었어요. 나중에 확인할게요."',
+   svg:svg('<rect x="90" y="60" width="140" height="90" rx="6" class="cf"/><path d="M90 60 L160 112 L230 60" fill="none" class="ar" style="stroke-width:2"/>'+big(160,192,'? ? ? ?',20)+text(160,40,'봉투 속 쪽지: 1089 (비밀)','lb'))},
+  {t:'세 자리 숫자 하나 정하기',x:'관객이 세 자리 숫자를 하나 몰래 정합니다. 단, 첫째 자리와 끝자리는 서로 달라야 해요(예: 732).',say:'"세 자리 숫자를 하나 정하세요. 첫 자리와 끝 자리는 달라야 해요."',
+   svg:svg([7,3,2].map((d,i)=>`<rect x="${85+i*55}" y="60" width="50" height="64" rx="6" class="cf"/>`+big(110+i*55,105,d,32)).join('')+text(160,45,'예: 7 3 2','lb')+text(110,150,'첫째 자리','lb m')+text(220,150,'끝자리','lb m')+text(160,185,'첫째 ≠ 끝자리','lb'))},
+  {t:'뒤집어서 큰 수에서 작은 수 빼기',x:'숫자를 거꾸로 뒤집은 수를 만들어, 큰 수에서 작은 수를 뺍니다. 예: 732 − 237 = 495. 결과가 세 자리가 아니면 앞에 0을 붙여요(099).',say:'"그 숫자를 거꾸로 쓰고, 큰 수에서 작은 수를 빼 보세요."',
+   svg:svg(big(160,60,'732',30)+big(160,95,'− 237',30)+'<line x1="110" y1="108" x2="210" y2="108" class="ar" style="stroke-width:2"/>'+big(160,150,'495',30)+text(160,190,'결과가 두 자리면 앞에 0 (099)','lb m'))},
+  {t:'결과를 뒤집어서 더하기',x:'뺀 결과를 거꾸로 뒤집어 원래 결과와 더합니다. 495 + 594 = 1089. 어떤 숫자로 시작해도 결과가 같아요!',say:'"그 답을 거꾸로 쓰고, 처음 답과 더해 보세요. 이제 머릿속에 큰 숫자가 떠올랐죠?"',
+   svg:svg(big(160,60,'495',30)+big(160,95,'+ 594',30)+'<line x1="110" y1="108" x2="210" y2="108" class="ar" style="stroke-width:2"/>'+big(160,150,'1089',34)+text(160,190,'언제나 1089!','lb m'))},
+  {t:'예언 공개!',x:'봉투를 열어 쪽지를 보여주세요. 관객이 계산한 값과 같아요.',say:'"봉투를 열어 볼까요? 1089, 맞죠?"',
+   svg:svg('<rect x="90" y="40" width="140" height="90" rx="6" class="cf hi"/>'+big(160,100,'1089',36)+text(160,170,'✨ 예언 적중!','lb'))}
+ ]
+},
+{
+ id:'dice',title:'주사위 탑 예언',level:'★☆☆ 아주 쉬움',time:'약 2분',
+ desc:'주사위를 쌓아 놓고, 보이지 않는 면의 눈을 합친 값을 순식간에 맞혀요.',
+ need:'주사위 3개 (개수는 상관없음)',
+ why:'주사위에서 마주 보는 두 면의 합은 항상 7이에요. 탑에서 숨은 면은 "각 주사위의 위+아래(=7)"가 모여 만들어지고 맨 위 주사위는 아랫면만 숨겨져 있어서, 합계 = 7×개수 − 맨 위 윗면이에요.',
+ tips:['맨 위 면만 슬쩍 보고 곧바로 계산하세요. 속으로 7×개수 − 윗면.','맞힌 뒤 관객이 직접 더해 보게 하면 설득력이 커져요.','주사위를 더 쌓아도 같은 공식이에요(4개면 7×4 − 윗면).'],
+ steps:[
+  {t:'주사위 탑 쌓기',x:'관객이 주사위 3개를 아무렇게나 위로 쌓습니다. 당신은 탑의 숨은 면을 모두 더한 값을 맞히겠다고 말해요.',say:'"주사위를 높이 쌓아 주세요. 안 보이는 면의 눈을 다 합쳐 볼게요."',
+   svg:svg(die(138,100,5,48)+die(138,52,3,48)+die(138,4,2,48)+text(214,30,'맨 위 주사위','lb','start')+text(214,126,'맨 아래','lb','start'))},
+  {t:'맨 위 윗면만 확인',x:'탑에서 윗면에 보이는 눈만 슬쩍 확인합니다. 예: 4.',say:'(속으로) "윗면은 4…"',
+   svg:svg(die(138,90,4,48,true)+arrow(190,70,162,86)+text(200,62,'윗면 눈만 기억','lb','start')+text(160,180,'예: 윗면 = 4','lb'))},
+  {t:'7×(주사위 개수) − 윗면',x:'7에 주사위 개수를 곱하고, 윗면 눈을 뺍니다. 3개, 윗면 4면 7×3 − 4 = 17입니다.',say:'"집중해 볼게요… 숨은 면의 합은 17이에요!"',
+   svg:svg(big(160,80,'7 × 3 − 4',34)+big(160,140,'= 17',40)+text(160,185,'숨은 면 합계','lb m'))},
+  {t:'관객이 직접 확인',x:'관객이 주사위를 하나씩 풀어 숨은 면을 모두 더해 보게 합니다. 정확히 17이에요.',say:'"직접 더해 보세요. 17이죠?"',
+   svg:svg(die(40,40,5,48)+die(136,40,3,48)+die(232,40,2,48)+text(64,110,'위+아래','lb')+text(64,127,'= 7','lb')+text(160,110,'위+아래','lb')+text(160,127,'= 7','lb')+text(256,110,'아랫면만','lb')+text(256,127,'= 7 − 4 = 3','lb')+big(160,185,'7 + 7 + 3 = 17',22))}
+ ]
+},
+{
+ id:'binary',title:'마법의 숫자 카드',level:'★★☆ 쉬움',time:'약 3분',
+ desc:'4장의 숫자 카드에 "있다/없다"만 답하면, 관객이 생각한 1~15 숫자를 맞혀요.',
+ need:'종이 카드 4장 (아래 숫자를 적어 두기)',
+ why:'카드는 숫자를 2진법으로 나눈 것이에요. 각 카드 왼쪽 위 숫자(1, 2, 4, 8)는 그 카드에 들어가는 자리의 값이라, "있다"고 한 카드의 맨 위 숫자를 모두 더하면 정답이에요.',
+ tips:['카드는 준비가 필요하지만, 한 번 만들면 계속 쓸 수 있어요.','카드 순서(A→B→C→D)를 섞어서 보여주세요. 합계만 하면 돼요.','암산을 천천히 하며 "음… 느낌이 오네요" 하고 시간을 끌어 보세요.'],
+ steps:[
+  {t:'숫자 카드 4장 만들기',x:'종이 4장에 아래 숫자를 적습니다. A는 1,3,5,7,9,11,13,15, B는 2,3,6,7,10,11,14,15, C는 4,5,6,7,12,13,14,15, D는 8~15예요.',say:'"이 4장이 마법의 카드예요."',
+   svg:svg(['A','B','C','D'].map((k,i)=>numcard(10+i*78,20,NC[k])+text(44+i*78,150,k,'lb')).join('')+text(160,190,'맨 위 숫자 1, 2, 4, 8이 열쇠','lb m'))},
+  {t:'1~15 숫자 하나 정하기',x:'관객이 1부터 15 사이의 숫자를 마음속으로 하나 정합니다. 말하면 안 돼요.',say:'"1부터 15 사이에서 마음에 드는 숫자를 하나 정하세요."',
+   svg:svg(big(160,95,'? (1~15)',40)+text(160,150,'관객만 아는 숫자','lb m'))},
+  {t:'카드마다 있나 없나 물어보기',x:'카드를 한 장씩 보여주며 "이 카드에 숫자가 있어요?"라고 묻고 "예/아니오"만 듣습니다. 예를 들어 11이라면 A·B·D는 "예", C는 "아니오".',say:'"이 카드에 당신 숫자가 있나요?"',
+   svg:svg(['A','B','C','D'].map((k,i)=>numcard(10+i*78,10,NC[k],k!=='C')+text(44+i*78,134,k!=='C'?'예 ✅':'아니오','lb')).join('')+text(160,175,'예라고 한 카드: A, B, D','lb m'))},
+  {t:'맨 위 숫자를 더하면 정답',x:'"예"라고 한 카드의 왼쪽 위 숫자를 모두 더합니다. 1(A) + 2(B) + 8(D) = 11. 그게 관객의 숫자예요!',say:'"당신의 숫자는… 11이죠?"',
+   svg:svg(big(60,80,'1',34)+text(60,105,'A','lb m')+big(110,80,'+',28)+big(160,80,'2',34)+text(160,105,'B','lb m')+big(210,80,'+',28)+big(260,80,'8',34)+text(260,105,'D','lb m')+big(160,160,'= 11',40))}
+ ]
+}
+);
+
+/* ---------- 추가 마술 2차 ---------- */
+function flow(vals,labels,hiIdx=-1,y=60){
+  const bw=62,gap=14,tot=vals.length*bw+(vals.length-1)*gap,x0=(320-tot)/2;let g='';
+  vals.forEach((v,i)=>{const x=x0+i*(bw+gap);
+    g+=`<rect x="${x}" y="${y}" width="${bw}" height="56" rx="8" class="cf${i===hiIdx?' hi':''}"/>`+big(x+bw/2,y+38,v,28)+text(x+bw/2,y+76,labels[i],'lb m');
+    if(i)g+=arrow(x-gap+1,y+28,x-1,y+28);});
+  return g;
+}
+const coin=(x,y)=>`<circle cx="${x}" cy="${y}" r="11" fill="#f2c94c" stroke="#a87b00" stroke-width="2"/>`;
+function handBox(x,y,label,n){
+  let g=`<rect x="${x}" y="${y}" width="110" height="90" rx="16" class="cf"/>`+text(x+55,y+110,label,'lb');
+  for(let i=0;i<n;i++)g+=coin(x+(n===1?55:38+i*34),y+45);
+  return g;
+}
+
+TRICKS.push(
+{
+ id:'five',title:'마음속 숫자는 항상 5',level:'★☆☆ 아주 쉬움',time:'약 2분',
+ desc:'관객이 정한 숫자를 몇 번 계산하게 하면, 결국 항상 5가 남아요. 마음을 읽는 척하기 딱 좋은 계산 마술.',
+ need:'없음 (계산기나 종이가 있으면 좋아요)',
+ why:'처음 숫자를 n이라 하면 ×2 → 2n, +10 → 2n+10, ÷2 → n+5, 처음 숫자 빼기 → 5. n이 사라지니 어떤 숫자로 시작해도 5예요.',
+ tips:['정답을 바로 말하지 말고 "지금 머릿속에 5가 떠오르네요"처럼 뜸을 들이세요.','더하는 수를 바꾸면 정답도 바뀌어요. 10 대신 20을 더하면 항상 10이에요(더하는 수의 절반).','같은 사람에게 두 번 하지 마세요. 원리가 들통나요.'],
+ steps:[
+  {t:'숫자를 하나 정해 2배 하기',x:'관객이 1~20 사이의 숫자를 마음속으로 하나 정하고, 그 숫자를 2배 하게 합니다. 예: 7 → 14.',say:'"숫자를 하나 정하세요. 말하지 말고 그 숫자를 2배 해 보세요."',
+   svg:svg(flow([7,14],['생각한 숫자','×2'],0))},
+  {t:'10을 더하기',x:'나온 값에 10을 더하게 합니다. 예: 14 + 10 = 24.',say:'"거기에 10을 더하세요."',
+   svg:svg(flow([7,14,24],['생각한 숫자','×2','+10'],2))},
+  {t:'반으로 나누고 처음 숫자 빼기',x:'나온 값을 반으로 나누게 하고, 처음에 생각한 숫자를 빼게 합니다. 예: 24 ÷ 2 = 12, 12 − 7 = 5.',say:'"반으로 나누고, 처음 생각한 숫자를 빼 보세요."',
+   svg:svg(flow([7,14,24,12],['생각한 숫자','×2','+10','÷2'],3)+text(160,170,'12 − 처음 숫자(7) = ?','lb'))},
+  {t:'정답은 5!',x:'마음을 읽는 척하다가 "지금 머릿속 숫자는 5죠?"라고 말합니다. 어떤 숫자로 시작해도 5예요.',say:'"당신의 머릿속에는… 5가 있네요!"',
+   svg:svg(big(160,90,'12 − 7 = 5',34)+text(160,140,'어떤 숫자로 시작해도 항상 5','lb')+text(160,175,'처음 숫자가 계산 중에 사라져요','lb m'))}
+ ]
+},
+{
+ id:'missing',title:'사라진 숫자 맞히기',level:'★★☆ 쉬움',time:'약 3분',
+ desc:'관객이 만든 숫자에서 동그라미 친 숫자 하나를 가리고 알려 주면, 가려진 숫자를 정확히 맞혀요.',
+ need:'종이와 펜',
+ why:'숫자를 섞어서 뺀 값은 항상 9의 배수예요. 9의 배수는 모든 자리 숫자를 더해도 9의 배수라서, 나머지 숫자의 합에서 9의 배수까지 모자란 만큼이 가려진 숫자예요.',
+ tips:['동그라미 칠 숫자는 0이 아니어야 해요. 0과 9를 구분할 수 없거든요.','나머지 숫자의 합이 9의 배수이면 가려진 숫자는 9예요.','합이 크면 "다음 9의 배수(9, 18, 27, 36…)까지 얼마"로 계산하세요.'],
+ steps:[
+  {t:'여러 자리 숫자 쓰기',x:'관객이 3~5자리 숫자를 하나 적습니다. 0이 없는 숫자가 가장 좋아요. 예: 6382.',say:'"4자리 숫자를 하나 적어 보세요. 저는 안 볼게요."',
+   svg:svg([6,3,8,2].map((d,i)=>`<rect x="${70+i*55}" y="65" width="50" height="64" rx="6" class="cf"/>`+big(95+i*55,108,d,32)).join('')+text(160,45,'예: 6 3 8 2','lb')+text(160,170,'관객만 아는 숫자','lb m'))},
+  {t:'숫자를 섞어 새 숫자 만들고 빼기',x:'같은 숫자들로 순서만 바꿔 새 숫자를 만들고, 큰 수에서 작은 수를 뺍니다. 예: 6382 − 2386 = 3996.',say:'"같은 숫자를 섞어서 다른 숫자를 만들고, 큰 수에서 작은 수를 빼 보세요."',
+   svg:svg(big(160,60,'6382',30)+big(160,100,'− 2386',30)+'<line x1="100" y1="112" x2="220" y2="112" class="ar" style="stroke-width:2"/>'+big(160,155,'3996',34)+text(160,190,'결과는 항상 9의 배수!','lb m'))},
+  {t:'숫자 하나에 동그라미 치고 나머지 알려 주기',x:'결과에서 0이 아닌 숫자 하나에 동그라미를 치고, 나머지 숫자들을 순서와 상관없이 읽어 달라고 합니다. 예: 6에 동그라미 → 3, 9, 9.',say:'"숫자 하나에 동그라미를 치세요. 나머지 숫자를 읽어 주세요."',
+   svg:svg([3,9,9,6].map((d,i)=>`<rect x="${70+i*55}" y="65" width="50" height="64" rx="6" class="cf${i===3?' hi':''}"/>`+big(95+i*55,108,i===3?'?':d,32)).join('')+text(160,45,'3 9 9 [비밀]','lb')+text(160,170,'나머지 3, 9, 9만 알려 줌','lb m'))},
+  {t:'모자란 만큼이 정답',x:'들은 숫자를 더하고(3+9+9=21), 그 다음 9의 배수(27)까지 모자란 만큼이 가려진 숫자예요. 27 − 21 = 6!',say:'"동그라미 친 숫자는… 6이죠?"',
+   svg:svg(big(160,70,'3 + 9 + 9 = 21',30)+big(160,120,'27 − 21 = 6',34)+text(160,165,'다음 9의 배수(27)까지 모자란 수','lb')+text(160,190,'0을 동그라미 치면 안 돼요','lb m'))}
+ ]
+},
+{
+ id:'hand',title:'어느 손에 있을까?',level:'★☆☆ 아주 쉬움',time:'약 2분',
+ desc:'등 뒤에 숨긴 1개와 2개 중 어느 손에 1개가 있는지, 관객의 계산 결과만 듣고 맞혀요.',
+ need:'동전·구슬 등 작은 물건 3개 (1개 + 2개로 나눠 사용)',
+ why:'왼손이 1개, 오른손이 2개이면 1×2 + 2×3 = 8(짝수). 반대로 왼손 2개, 오른손 1개이면 2×2 + 1×3 = 7(홀수). 합이 짝수인지 홀수인지만 봐도 1개가 어느 손인지 알 수 있어요.',
+ tips:['관객이 직접 계산하게 하고 합계만 말하게 하세요.','"머리가 아프네요, 잠깐만요"처럼 집중하는 연기를 해 보세요.','한 번 맞히고 같은 사람에게 반복하지 마세요.'],
+ steps:[
+  {t:'1개와 2개 준비',x:'동전 3개를 준비해 한 손에 1개, 다른 손에 2개를 쥐어야 한다고 설명합니다. 관객이 등 뒤에서 몰래 정하게 해요.',say:'"한 손에 1개, 다른 손에 2개를 쥐어 보세요. 저는 안 볼게요."',
+   svg:svg(handBox(30,40,'왼손',1)+handBox(180,40,'오른손',2)+text(160,190,'어느 손이 1개인지는 비밀','lb m'))},
+  {t:'왼손은 ×2, 오른손은 ×3',x:'왼손에 있는 개수를 2배, 오른손에 있는 개수를 3배 하게 하고 두 결과를 더하게 합니다.',say:'"왼손에 있는 개수는 2배, 오른손은 3배 하세요. 그리고 둘을 더해 주세요."',
+   svg:svg(big(160,70,'왼손 × 2',28)+big(160,110,'+ 오른손 × 3',28)+'<line x1="80" y1="124" x2="240" y2="124" class="ar" style="stroke-width:2"/>'+big(160,165,'= 합계',32))},
+  {t:'합계를 듣고 판단',x:'관객이 합계를 말하면, 짝수이면 1개는 왼손에, 홀수이면 오른손에 있어요.',say:'"합계가 짝수네요… 1개는 왼손에 있죠?"',
+   svg:svg(big(160,60,'8 (짝수)',28)+text(160,85,'→ 1개는 왼손','lb')+big(160,135,'7 (홀수)',28)+text(160,160,'→ 1개는 오른손','lb')+text(160,195,'1×2+2×3=8,  2×2+1×3=7','lb m'))},
+  {t:'손을 펴서 확인',x:'정답을 말하고 관객이 손을 펴서 확인하게 합니다.',say:'"손을 펴 보세요. 제 말이 맞죠?"',
+   svg:svg(handBox(30,40,'왼손',1)+handBox(180,40,'오른손',2)+text(160,195,'✨ 정답!','lb'))}
+ ]
+},
+{
+ id:'ninth',title:'9번째 카드 예언',level:'★★☆ 쉬움',time:'약 3분',
+ desc:'관객이 고른 숫자와 상관없이, 딜하다 보면 항상 미리 예언한 9번째 카드가 나와요.',
+ need:'카드 한 벌',
+ why:'10~19 중 어떤 숫자를 골라도 (숫자) − (각 자리 합)은 언제나 9예요. 예: 14−(1+4)=9, 17−(1+7)=9. 그래서 위에서 9번째 카드가 정답이 돼요.',
+ tips:['덱을 미리 섞은 척하면서 위에서 9번째 카드를 확인하거나 원하는 카드를 9번째에 두세요.','반드시 10~19 사이의 숫자로 하세요. 20 이상이면 결과가 달라져요.','관객이 덱을 만지더라도 위쪽 9장은 건드리지 않게 하세요.'],
+ steps:[
+  {t:'위에서 9번째 카드를 확인하고 예언 적기',x:'덱을 보면서(또는 섞는 척하면서) 위에서 9번째 카드를 확인하고, 그 카드 이름을 종이에 써서 접어 둡니다. 예: ♥Q.',say:'"제가 미리 카드 한 장을 예언해 두었어요."',
+   svg:svg(Array.from({length:9},(_,i)=>8-i).map(i=>card(130,8+i*13,{hi:i===8})).join('')+text(100,30,'1','lb','end')+text(100,128,'9','lb','end')+text(214,128,'← 이 카드를 예언','lb','start')+text(160,200,'덱은 얼굴을 아래로, 건드리지 마세요','lb m'))},
+  {t:'10~19 사이 숫자 하나 정하기',x:'관객이 10부터 19 사이의 숫자를 하나 정합니다. 말하지 않아도 돼요. 예: 14.',say:'"10부터 19 사이에서 숫자를 하나 정해 보세요."',
+   svg:svg(big(160,95,'10 ~ 19',40)+text(160,140,'예: 14','lb')+text(160,175,'반드시 이 범위에서!','lb m'))},
+  {t:'각 자리 숫자를 더해 빼기',x:'정한 숫자의 두 자리를 더하고, 그 합을 원래 숫자에서 빼게 합니다. 결과는 언제나 9! 예: 14 − (1+4) = 9.',say:'"그 숫자의 각 자리를 더하고, 원래 숫자에서 빼 보세요."',
+   svg:svg(big(160,60,'14',30)+big(160,100,'− (1 + 4)',28)+'<line x1="90" y1="112" x2="230" y2="112" class="ar" style="stroke-width:2"/>'+big(160,155,'9',38)+text(160,190,'10~19라면 언제나 9','lb m'))},
+  {t:'위에서 9장 딜하고 예언 공개',x:'관객이 그 숫자(9)만큼 덱 위에서 한 장씩 딜하게 하고, 9번째 카드를 뒤집어요. 예언한 카드와 같아요!',say:'"9번째 카드를 뒤집어 보세요. 제 예언과 같죠?"',
+   svg:svg(pile(60,20,8,10)+card(190,40,{face:'♥Q',hi:true})+text(82,172,'8장 딜','lb')+text(212,125,'9번째 = 예언 카드','lb')+text(160,195,'✨ 예언 적중!','lb m'))}
+ ]
+}
+);
+
+/* ---------- 앱 ---------- */
+const app=document.getElementById('app');
+let doneSet=new Set();
+try{doneSet=new Set(JSON.parse(localStorage.getItem('magic-done')||'[]'))}catch(e){}
+function saveDone(){try{localStorage.setItem('magic-done',JSON.stringify([...doneSet]))}catch(e){}}
+
+const CAT={'21':'카드','key':'카드','pairs':'카드','ninth':'카드','1089':'숫자','five':'숫자','missing':'숫자','binary':'숫자','dice':'물건','hand':'물건'};
+TRICKS.forEach(t=>{t.cat=CAT[t.id]||'기타';t.stars=(t.level.match(/★/g)||[]).length});
+const LEVELS=[['all','전체 난이도'],['1','★ 아주 쉬움'],['2','★★ 쉬움']];
+const CATS=['전체 종류','카드','숫자','물건'];
+let filt={lv:'all',cat:'전체 종류'};
+try{Object.assign(filt,JSON.parse(localStorage.getItem('magic-filter')||'{}'))}catch(e){}
+let installEvt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;const b=document.getElementById('install');if(b)b.hidden=false});
+
+function home(){
+  const chip=(grp,val,label,on)=>`<button class="chip${on?' on':''}" data-grp="${grp}" data-val="${val}">${label}</button>`;
+  app.innerHTML=`<h1>🎩 쉬운 카드마술 배우기</h1><p class="sub">그림 보면서 따라 하는 5분 마술. 배우고 싶은 걸 골라 보세요.</p>
+  <button class="b p" id="install" ${installEvt?'':'hidden'} style="width:100%;margin-bottom:12px">📲 홈 화면에 앱으로 설치</button>
+  <div class="chips">${LEVELS.map(([v,l])=>chip('lv',v,l,filt.lv===v)).join('')}</div>
+  <div class="chips">${CATS.map(c=>chip('cat',c,c,filt.cat===c)).join('')}</div>
+  <div id="list"></div>
+  <div class="foot"><a id="src">마술 자료 출처와 안내</a><p class="hint" id="ioshint"></p></div>`;
+  const list=document.getElementById('list');
+  function render(){
+    const items=TRICKS.filter(t=>(filt.lv==='all'||t.stars===+filt.lv)&&(filt.cat==='전체 종류'||t.cat===filt.cat));
+    list.innerHTML=items.length?items.map(t=>`<button class="tile" data-id="${t.id}"><h2>${t.title} ${doneSet.has(t.id)?'<span class="done">✓ 완료</span>':''}</h2><p>${t.desc}</p><span class="tag">${t.level}</span><span class="tag">${t.cat} 마술</span><span class="tag">⏱ ${t.time}</span><span class="tag">🎒 ${t.need}</span></button>`).join(''):'<p class="sub">조건에 맞는 마술이 없어요. 필터를 바꿔 보세요.</p>';
+    list.querySelectorAll('.tile').forEach(b=>b.onclick=()=>{location.hash='#/'+b.dataset.id});
+  }
+  app.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    filt[c.dataset.grp]=c.dataset.val;
+    try{localStorage.setItem('magic-filter',JSON.stringify(filt))}catch(e){}
+    app.querySelectorAll(`.chip[data-grp="${c.dataset.grp}"]`).forEach(x=>x.classList.toggle('on',x===c));
+    render();
+  });
+  render();
+  document.getElementById('install').onclick=async()=>{if(!installEvt)return;installEvt.prompt();await installEvt.userChoice;installEvt=null;document.getElementById('install').hidden=true};
+  if(/iphone|ipad/i.test(navigator.userAgent)&&!navigator.standalone)document.getElementById('ioshint').textContent='아이폰: 공유 버튼 → "홈 화면에 추가"로 앱처럼 설치할 수 있어요.';
+  document.getElementById('src').onclick=()=>{location.hash='#/about'};
+}
+
+function trick(id,n){
+  const t=TRICKS.find(x=>x.id===id);if(!t)return home();
+  const total=t.steps.length;
+  if(n===undefined||n<0)n=0;
+  if(n>total)n=total;
+  if(n===total){ // 마무리 화면
+    doneSet.add(id);saveDone();
+    app.innerHTML=`<button class="back">← 목록으로</button><h1>${t.title} 완료 🎉</h1>
+    <div class="box"><h3>왜 이게 되는 걸까요?</h3><p>${t.why}</p></div>
+    <div class="box"><h3>실전 팁</h3><ul>${t.tips.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+    <div class="nav"><button class="b" id="again">처음부터 다시</button><button class="b p" id="list">다른 마술 보기</button></div>`;
+    app.querySelector('.back').onclick=()=>{location.hash='#/'};
+    document.getElementById('again').onclick=()=>{location.hash='#/'+id+'/0'};
+    document.getElementById('list').onclick=()=>{location.hash='#/'};
+    return;
+  }
+  const s=t.steps[n];
+  app.innerHTML=`<button class="back">← 목록으로</button><h1>${t.title}</h1><p class="sub">준비물: ${t.need}</p>
+  <div class="dots">${t.steps.map((_,i)=>`<span class="dot${i===n?' on':''}"></span>`).join('')}</div>
+  <div class="stage">${s.svg}</div>
+  <div class="step"><h2>${n+1}. ${s.t}</h2><p>${s.x}</p><div class="say">${s.say}</div></div>
+  <div class="nav"><button class="b" id="prev" ${n===0?'disabled':''}>이전</button><button class="b p" id="next">${n===total-1?'마무리':'다음'}</button></div>`;
+  app.querySelector('.back').onclick=()=>{location.hash='#/'};
+  document.getElementById('prev').onclick=()=>{location.hash=`#/${id}/${n-1}`};
+  document.getElementById('next').onclick=()=>{location.hash=`#/${id}/${n+1}`};
+}
+
+function about(){
+  app.innerHTML=`<button class="back">← 목록으로</button><h1>자료 출처와 안내</h1>
+  <div class="box"><h3>어디서 마술 자료를 구하나요?</h3><ul>
+  <li><b>저작권이 풀린 고전 마술서</b>: Hoffmann의 <i>Modern Magic</i>(1876), Erdnase의 <i>Expert at the Card Table</i>(1902) 등은 Project Gutenberg, Internet Archive에 공개돼 있어요.</li>
+  <li><b>자동 마술(self-working)</b>: 21장 마술처럼 수학 원리로 되는 고전 마술은 수백 년 전부터 전해진 공용 지식이에요.</li>
+  <li><b>직접 창작한 설명</b>: 이 앱의 그림과 글은 마술 방법만 참고하고 표현은 새로 만든 것입니다.</li></ul></div>
+  <div class="box"><h3>주의할 점</h3><ul>
+  <li>마술의 <b>방법 자체</b>는 보통 저작권으로 보호되지 않지만, 책·영상의 <b>글과 그림</b>은 보호돼요. 그대로 복사하지 말고 새로 쓰세요.</li>
+  <li>특정 마술사가 만든 <b>최근 창작 마술</b>은 허락 없이 가져오지 않는 것이 마술계의 예의예요.</li>
+  <li>마술은 <b>관객 앞에서 비밀을 지키는 것</b>이 매력이에요. 앱 설명에서도 "어떻게 해?"를 묻는 사람에게는 웃으며 비밀이라고 해 주세요.</li></ul></div>`;
+  app.querySelector('.back').onclick=()=>{location.hash='#/'};
+}
+
+function route(){
+  const p=location.hash.replace(/^#\/?/,'').split('/');
+  if(!p[0])return home();
+  if(p[0]==='about')return about();
+  trick(p[0],p[1]!==undefined?parseInt(p[1],10):0);
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',route);
+route();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
